@@ -2,6 +2,7 @@ import logging
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import torch
 
 
 def get_sent_word_idxs(offsets: list):
@@ -235,7 +236,7 @@ def get_entity_pair_attr_idxs(left_entity: pd.Series, right_entity: pd.Series, t
 
 
 def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, tokenize_method: str, max_len: int,
-                         return_offset: bool = False):
+                         return_offset: bool = False, typeMask:str = 'off'):
 
     assert isinstance(entity1, pd.Series), "Wrong data type for param 'entity1'."
     assert isinstance(entity2, pd.Series), "Wrong data type for param 'entity2'."
@@ -253,6 +254,9 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
         features = tokenizer(sent1, sent2, padding='max_length', truncation=True, return_tensors="pt",
                              max_length=max_len, add_special_tokens=True, pad_to_max_length=True,
                              return_attention_mask=True, return_offsets_mapping=return_offset)
+        if typeMask == 'random':
+            features = mask_random(features)
+
 
     elif tokenize_method == 'attr':
         sent = ""
@@ -264,6 +268,7 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
         features = tokenizer(sent, padding='max_length', truncation=True, return_tensors="pt", max_length=max_len,
                              add_special_tokens=True, pad_to_max_length=True, return_attention_mask=True,
                              return_offsets_mapping=return_offset)
+
         sent1 = sent[:]
         sent2 = None
 
@@ -281,6 +286,8 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
         features = tokenizer(sent1, sent2, padding='max_length', truncation=True, return_tensors="pt",
                              max_length=max_len, add_special_tokens=True, pad_to_max_length=True,
                              return_attention_mask=True, return_offsets_mapping=return_offset)
+        if typeMask == 'random':
+            features = mask_random(features)
 
     else:
         raise ValueError("Wrong tokenization method.")
@@ -292,3 +299,12 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
     flat_features['sent2'] = sent2
 
     return flat_features
+
+def mask_random(features):
+    input_ids = features['input_ids'].unsqueeze(0)
+    rand = torch.rand(input_ids.shape)
+    mask_arr = (rand < 0.15) * (input_ids != 101) * (input_ids != 102) * (input_ids != 0)
+    selection = torch.flatten((mask_arr[0][0]).nonzero()).tolist()
+    input_ids[0][0, selection] = 103
+    features['inputs_ids'] = input_ids
+    return features

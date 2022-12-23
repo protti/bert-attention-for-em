@@ -120,6 +120,10 @@ if __name__ == '__main__':
                         help='the prefix used to identify the columns related to the left entity')
     parser.add_argument('-right', '--right_prefix', default='right_', type=str,
                         help='the prefix used to identify the columns related to the right entity')
+    parser.add_argument('-typeMask', '--typeMask', default='off', type=str,
+                        help='mask typing')
+    parser.add_argument('-columnMask', '--columnMask', default=[1], type=list,
+                        help='list attributes to mask')
     parser.add_argument('-max_len', '--max_len', default=128, type=int,
                         help='the maximum BERT sequence length')
     parser.add_argument('-permute', '--permute', default=False, type=lambda x: bool(distutils.util.strtobool(x)),
@@ -164,6 +168,8 @@ if __name__ == '__main__':
             'max_len': args.max_len,
             'permute': args.permute,
             'verbose': args.verbose,
+            'typeMask': args.typeMask,
+            'columnMask': args.columnMask,
         }
 
         train_conf = conf.copy()
