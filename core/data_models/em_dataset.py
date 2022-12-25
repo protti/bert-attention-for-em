@@ -13,7 +13,7 @@ class EMDataset(Dataset):
                  label_col: str = 'label', left_prefix: str = 'left_',
                  right_prefix: str = 'right_', max_len: int = 256,
                  verbose: bool = False, categories: list = None,
-                 permute: bool = False, seed: int = 42, typeMask: str = 'off',columnMask: list=[1], return_offset: bool = False):
+                 permute: bool = False, seed: int = 42, typeMask: str = 'off',columnMask: str='', return_offset: bool = False):
 
         assert isinstance(tokenization, str)
         assert tokenization in ['sent_pair', 'attr', 'attr_pair']
@@ -32,6 +32,7 @@ class EMDataset(Dataset):
         self.seed = seed
         self.return_offset = return_offset
         self.typeMask = typeMask
+        self.columnMask = columnMask
 
         if label_col not in self.data.columns:
             raise ValueError("Label column not found.")
@@ -84,7 +85,7 @@ class EMDataset(Dataset):
     def get_params(self):
         params = {'model_name': self.model_name, 'label_col': self.label_col, 'left_prefix': self.left_prefix,
                   'right_prefix': self.right_prefix, 'max_len': self.max_len, 'tokenization': self.tokenization,
-                  'return_offset': self.return_offset, 'typeMask':self.typeMask}
+                  'return_offset': self.return_offset, 'typeMask':self.typeMask, 'columnMask':self.columnMask}
 
         return params
 
@@ -139,7 +140,8 @@ class EMDataset(Dataset):
                 left_row[attr] = permuted_val
 
         tokenized_row = tokenize_entity_pair(left_row, right_row, self.tokenizer, self.tokenization, self.max_len,
-                                             return_offset=self.return_offset, typeMask=self.typeMask)
+                                             return_offset=self.return_offset, typeMask=self.typeMask,
+                                             columnMask=self.columnMask)
         tokenized_row['labels'] = torch.tensor(label, dtype=torch.long)
         if self.categories is not None:
             tokenized_row['category'] = category

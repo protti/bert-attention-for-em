@@ -122,7 +122,7 @@ if __name__ == '__main__':
                         help='the prefix used to identify the columns related to the right entity')
     parser.add_argument('-typeMask', '--typeMask', default='off', type=str,
                         help='mask typing')
-    parser.add_argument('-columnMask', '--columnMask', default=[1], type=list,
+    parser.add_argument('-columnMask', '--columnMask', default='', type=str,
                         help='list attributes to mask')
     parser.add_argument('-max_len', '--max_len', default=128, type=int,
                         help='the maximum BERT sequence length')

@@ -1,4 +1,6 @@
 import logging
+import re
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -236,7 +238,7 @@ def get_entity_pair_attr_idxs(left_entity: pd.Series, right_entity: pd.Series, t
 
 
 def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, tokenize_method: str, max_len: int,
-                         return_offset: bool = False, typeMask:str = 'off'):
+                         return_offset: bool = False, typeMask: str = 'off', columnMask: str = ''):
 
     assert isinstance(entity1, pd.Series), "Wrong data type for param 'entity1'."
     assert isinstance(entity2, pd.Series), "Wrong data type for param 'entity2'."
@@ -256,6 +258,9 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
                              return_attention_mask=True, return_offsets_mapping=return_offset)
         if typeMask == 'random':
             features = mask_random(features)
+        if typeMask == 'selectCol':
+            print('I cant mask entire sentence')
+            exit(0)
 
 
     elif tokenize_method == 'attr':
@@ -274,14 +279,26 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
 
     elif tokenize_method == 'attr_pair':
         sent1 = ""
-        for attr_val in entity1.to_list():
-            sent1 += "{} [SEP] ".format(str(attr_val))
-        sent1 = sent1[:-7]  # remove last ' [SEP] '
-
         sent2 = ""
-        for attr_val in entity2.to_list():
-            sent2 += "{} [SEP] ".format(str(attr_val))
-        sent2 = sent2[:-7]  # remove last ' [SEP] '
+
+        if typeMask == 'selectCol':
+            columnMaskInt = list(map(int, re.findall('(\d+)', columnMask)))
+
+            if len(entity1.to_list()) < max(columnMaskInt):
+                print('Some of the column provided wont be considered because are higher than the numbers of attributes.')
+
+
+            sent1, sent2 = mask_column(entity1, entity2, columnMaskInt)
+        else:
+
+            for attr_val in entity1.to_list():
+                sent1 += "{} [SEP] ".format(str(attr_val))
+            sent1 = sent1[:-7]  # remove last ' [SEP] '
+
+
+            for attr_val in entity2.to_list():
+                sent2 += "{} [SEP] ".format(str(attr_val))
+            sent2 = sent2[:-7]  # remove last ' [SEP] '
 
         features = tokenizer(sent1, sent2, padding='max_length', truncation=True, return_tensors="pt",
                              max_length=max_len, add_special_tokens=True, pad_to_max_length=True,
@@ -308,3 +325,27 @@ def mask_random(features):
     input_ids[0][0, selection] = 103
     features['inputs_ids'] = input_ids
     return features
+
+def mask_column(entity1, entity2, columnMask):
+
+
+
+    sent1 = ""
+    attr = 0
+    for attr_val in entity1.to_list():
+        if attr in columnMask:
+            attr_val = '[MASK]'
+        sent1 += "{} [SEP] ".format(str(attr_val))
+        attr += 1
+
+    sent1 = sent1[:-7]  # remove last ' [SEP] '
+
+    sent2 = ""
+    attr = 0
+    for attr_val in entity2.to_list():
+        if attr in columnMask:
+            attr_val = '[MASK]'
+        attr += 1
+        sent2 += "{} [SEP] ".format(str(attr_val))
+    sent2 = sent2[:-7]  # remove last ' [SEP] '
+    return sent1, sent2
