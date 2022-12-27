@@ -287,25 +287,17 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
 
         if typeMask == 'selectCol':
             columnMaskInt = list(map(int, re.findall('(\d+)', columnMask)))
-
             if len(entity1.to_list()) < max(columnMaskInt):
                 print('Some of the column provided wont be considered because are higher than the numbers of attributes.')
             sent1, sent2 = mask_column(entity1, entity2, columnMaskInt)
         else:
-
             for attr_val in entity1.to_list():
                 sent1 += "{} [SEP] ".format(str(attr_val))
             sent1 = sent1[:-7]  # remove last ' [SEP] '
 
-
             for attr_val in entity2.to_list():
                 sent2 += "{} [SEP] ".format(str(attr_val))
             sent2 = sent2[:-7]  # remove last ' [SEP] '
-
-            if typeMask == 'maskSyn':
-                top_word_pairs_by_syntax = nlp.get_syntactically_similar_words_from_sent_pair \
-                    (sent1, sent2, 3, "edit", return_idxs=True, return_sims=True)
-                print(top_word_pairs_by_syntax)
 
         features = tokenizer(sent1, sent2, padding='max_length', truncation=True, return_tensors="pt",
                              max_length=max_len, add_special_tokens=True, pad_to_max_length=True,
@@ -313,7 +305,8 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
 
         if typeMask == 'random':
             features = mask_random(features)
-
+        elif typeMask == 'maskSyn':
+            features = mask_syn(sent1, sent2, features, '[SEP]')
     else:
         raise ValueError("Wrong tokenization method.")
 
@@ -356,14 +349,17 @@ def mask_column(entity1, entity2, columnMask):
     return sent1, sent2
 
 
-def mask_syn(sent1, sent2, features):
+def mask_syn(sent1, sent2, features, sep: str= ' '):
 
     top_word_pairs_by_syntax = nlp.get_syntactically_similar_words_from_sent_pair \
-        (sent1.split(' '), sent2.split(' '), 3, "edit", return_idxs=True, return_sims=True)
+        (sent1.split(sep), sent2.split(sep), 2, "edit", return_idxs=True, return_sims=True)
 
+    input_ids = features['input_ids'].unsqueeze(0)
     for couple in top_word_pairs_by_syntax['word_pair_idxs']:
-        input_ids = features['input_ids'].unsqueeze(0)
-        index_mask = get_index_token(couple, features.word_ids())
+        if sep == ' ':
+            index_mask = get_index_token_sent(couple, features.word_ids())
+        else:
+            index_mask = get_index_token_attr(couple, features.tokens(), features.word_ids())
         for val_mask in index_mask:
             input_ids[0][0, val_mask] = 103
 
@@ -371,14 +367,30 @@ def mask_syn(sent1, sent2, features):
     return features
 
 
+def get_index_token_sent(couple, list_idx_word):
 
-def get_index_token(couple, list_idx_word):
     idx_first = [i for i, j in enumerate(list_idx_word) if j == couple[0]]
     idx_second = [i for i, j in enumerate(list_idx_word) if j == couple[1]]
     idx_second_none = [i for i, j in enumerate(list_idx_word) if j is None][1]
-
     listMask = [j for j in idx_first if j < idx_second_none] + [j for j in idx_second if j > idx_second_none]
     return listMask
 
+
+def get_index_token_attr(couple, list_token, list_idx_word):
+
+    listTokenMask = []
+    indexSep = [0, [i for i, j in enumerate(list_idx_word) if j is None][1], [i for i, j in enumerate(list_idx_word) if j is None][2]]
+    for i in range(len(indexSep)-1):
+        idxCouple = 0
+        countSep = 0
+        for wordIdx in range(indexSep[i]+1, indexSep[i+1]):
+            if list_token[wordIdx] == '[SEP]':
+                countSep += 1
+            if countSep == couple[idxCouple]:
+                listTokenMask.append(wordIdx)
+            if countSep > couple[idxCouple]:
+                idxCouple += 1
+                break
+    return listTokenMask
 
 
