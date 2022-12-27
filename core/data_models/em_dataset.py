@@ -85,7 +85,7 @@ class EMDataset(Dataset):
     def get_params(self):
         params = {'model_name': self.model_name, 'label_col': self.label_col, 'left_prefix': self.left_prefix,
                   'right_prefix': self.right_prefix, 'max_len': self.max_len, 'tokenization': self.tokenization,
-                  'return_offset': self.return_offset, 'typeMask':self.typeMask, 'columnMask':self.columnMask}
+                  'return_offset': self.return_offset, 'typeMask':self.typeMask, 'columnMask': self.columnMask}
 
         return params
 

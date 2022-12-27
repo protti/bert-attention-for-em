@@ -132,7 +132,7 @@ def simple_tokenization_and_clean(text: str):
     assert isinstance(text, str), "Wrong data type for parameter 'text'."
 
     # remove non-alphabetical and short words
-    return [word for word in text.split() if len(word) > 1]# if word.isalpha() and len(word) > 3]
+    return [word for word in text.split() if len(word) > 1] # if word.isalpha() and len(word) > 3]
 
 
 def get_pos_tag(word):
@@ -229,7 +229,7 @@ def get_syntactically_similar_words_from_sent_pair(sent1, sent2, thr, metric, eq
     all_pairs = list(itertools.product(sent1, sent2))
     all_pair_idxs = list(itertools.product(range(len(sent1)), range(len(sent2))))
     for idx, pair in enumerate(all_pairs):
-        left_word, right_word = pair[0], pair[1]
+        left_word, right_word = str(pair[0]), str(pair[1])
 
         # remove pairs of words composed by equal words
         # if left_word == right_word:

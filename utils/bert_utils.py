@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import torch
+import utils.nlp as nlp
 
 
 def get_sent_word_idxs(offsets: list):
@@ -252,16 +253,19 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
         sent1 = ' '.join([str(val) for val in entity1.to_list()])  # if val != unk_token])
         sent2 = ' '.join([str(val) for val in entity2.to_list()])  # if val != unk_token])
 
+
         # Tokenize the text pairs
         features = tokenizer(sent1, sent2, padding='max_length', truncation=True, return_tensors="pt",
                              max_length=max_len, add_special_tokens=True, pad_to_max_length=True,
                              return_attention_mask=True, return_offsets_mapping=return_offset)
+
         if typeMask == 'random':
             features = mask_random(features)
         if typeMask == 'selectCol':
             print('I cant mask entire sentence')
             exit(0)
-
+        if typeMask == 'maskSyn':
+            features = mask_syn(sent1,sent2, features)
 
     elif tokenize_method == 'attr':
         sent = ""
@@ -286,8 +290,6 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
 
             if len(entity1.to_list()) < max(columnMaskInt):
                 print('Some of the column provided wont be considered because are higher than the numbers of attributes.')
-
-
             sent1, sent2 = mask_column(entity1, entity2, columnMaskInt)
         else:
 
@@ -300,9 +302,15 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
                 sent2 += "{} [SEP] ".format(str(attr_val))
             sent2 = sent2[:-7]  # remove last ' [SEP] '
 
+            if typeMask == 'maskSyn':
+                top_word_pairs_by_syntax = nlp.get_syntactically_similar_words_from_sent_pair \
+                    (sent1, sent2, 3, "edit", return_idxs=True, return_sims=True)
+                print(top_word_pairs_by_syntax)
+
         features = tokenizer(sent1, sent2, padding='max_length', truncation=True, return_tensors="pt",
                              max_length=max_len, add_special_tokens=True, pad_to_max_length=True,
                              return_attention_mask=True, return_offsets_mapping=return_offset)
+
         if typeMask == 'random':
             features = mask_random(features)
 
@@ -327,9 +335,6 @@ def mask_random(features):
     return features
 
 def mask_column(entity1, entity2, columnMask):
-
-
-
     sent1 = ""
     attr = 0
     for attr_val in entity1.to_list():
@@ -349,3 +354,31 @@ def mask_column(entity1, entity2, columnMask):
         sent2 += "{} [SEP] ".format(str(attr_val))
     sent2 = sent2[:-7]  # remove last ' [SEP] '
     return sent1, sent2
+
+
+def mask_syn(sent1, sent2, features):
+
+    top_word_pairs_by_syntax = nlp.get_syntactically_similar_words_from_sent_pair \
+        (sent1.split(' '), sent2.split(' '), 3, "edit", return_idxs=True, return_sims=True)
+
+    for couple in top_word_pairs_by_syntax['word_pair_idxs']:
+        input_ids = features['input_ids'].unsqueeze(0)
+        index_mask = get_index_token(couple, features.word_ids())
+        for val_mask in index_mask:
+            input_ids[0][0, val_mask] = 103
+
+    features['inputs_ids'] = input_ids
+    return features
+
+
+
+def get_index_token(couple, list_idx_word):
+    idx_first = [i for i, j in enumerate(list_idx_word) if j == couple[0]]
+    idx_second = [i for i, j in enumerate(list_idx_word) if j == couple[1]]
+    idx_second_none = [i for i, j in enumerate(list_idx_word) if j is None][1]
+
+    listMask = [j for j in idx_first if j < idx_second_none] + [j for j in idx_second if j > idx_second_none]
+    return listMask
+
+
+
