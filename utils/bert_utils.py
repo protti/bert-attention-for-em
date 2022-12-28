@@ -1,6 +1,9 @@
 import logging
+import os
+import pickle
 import re
 
+import gensim
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -265,7 +268,9 @@ def tokenize_entity_pair(entity1: pd.Series, entity2: pd.Series, tokenizer, toke
             print('I cant mask entire sentence')
             exit(0)
         if typeMask == 'maskSyn':
-            features = mask_syn(sent1,sent2, features)
+            features = mask_syn(sent1, sent2, features)
+        if typeMask == 'maskSem':
+            features = mask_sem(sent1, sent2, features)
 
     elif tokenize_method == 'attr':
         sent = ""
@@ -349,13 +354,38 @@ def mask_column(entity1, entity2, columnMask):
     return sent1, sent2
 
 
-def mask_syn(sent1, sent2, features, sep: str= ' '):
+def mask_syn(sent1, sent2, features, sep: str = ' '):
 
     top_word_pairs_by_syntax = nlp.get_syntactically_similar_words_from_sent_pair \
-        (sent1.split(sep), sent2.split(sep), 2, "edit", return_idxs=True, return_sims=True)
+        (sent1.split(sep), sent2.split(sep), 3, "edit", return_idxs=True, return_sims=True)
 
     input_ids = features['input_ids'].unsqueeze(0)
     for couple in top_word_pairs_by_syntax['word_pair_idxs']:
+        if sep == ' ':
+            index_mask = get_index_token_sent(couple, features.word_ids())
+        else:
+            index_mask = get_index_token_attr(couple, features.tokens(), features.word_ids())
+        for val_mask in index_mask:
+            input_ids[0][0, val_mask] = 103
+
+    features['inputs_ids'] = input_ids
+    return features
+
+
+def mask_sem(sent1, sent2, features, sep: str= ' '):
+
+    if os.path.isfile('modelPick.pkl'):
+        sem_emb_model = pickle.load(open( "modelPick.pkl", "rb"))
+    else:
+        FAST_TEXT_PATH = os.path.join('C:\\Users\\jeson\\PycharmProjects\\bert-attention-for-em\\data', 'wiki-news-300d-1M', 'wiki-news-300d-1M.vec')
+        sem_emb_model = gensim.models.KeyedVectors.load_word2vec_format(FAST_TEXT_PATH, binary=False, encoding='utf8')
+        pickle.dump(sem_emb_model, open("modelPick.pkl", "wb"))
+
+    top_word_pairs_by_semantic = nlp.get_semantically_similar_words_from_sent_pair\
+        (sent1.split(sep), sent2.split(sep), sem_emb_model, 0.1, return_idxs=True, return_sims=True)
+
+    input_ids = features['input_ids'].unsqueeze(0)
+    for couple in top_word_pairs_by_semantic['word_pair_idxs']:
         if sep == ' ':
             index_mask = get_index_token_sent(couple, features.word_ids())
         else:

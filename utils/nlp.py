@@ -289,7 +289,7 @@ def get_semantically_similar_words_from_sent_pair(sent1, sent2, model, thr, retu
     all_pairs = list(itertools.product(sent1, sent2))
     all_pair_idxs = list(itertools.product(range(len(sent1)), range(len(sent2))))
     for idx, pair in enumerate(all_pairs):
-        left_word, right_word = pair[0], pair[1]
+        left_word, right_word = str(pair[0]), str(pair[1])
 
         # remove pairs of words composed by equal words
         # if left_word == right_word:
